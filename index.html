@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Case Generator</title>
+
+    <!-- OCR Library -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+
+    <!-- Your CSS file -->
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>AI Test Case Generator</h1>
+
+      <textarea
+        id="requirement"
+        placeholder="Enter a feature requirement..."
+      ></textarea>
+      <br />
+
+      <input type="file" id="imageInput" accept="image/*" />
+      <button id="extractBtn" >Extract Text From Screenshot</button>
+      <button id="generateBtn">Generate Test Case</button>
+
+      <!-- Status messages (OCR status, etc) -->
+      <pre
+        id="output"
+        style="background: #f3f3f3; padding: 10px; margin-top: 10px;"
+      ></pre>
+
+      <!-- Final test case output -->
+      <pre
+        id="finalOutput"
+        style="
+          background: #dff0d8;
+          padding: 10px;
+          margin-top: 10px;
+          border: 1px solid green;
+        "
+      ></pre>
+    </div>
+
+    <!-- Your JS file -->
+    <script src="script.js"></script>
+  </body>
+</html>
