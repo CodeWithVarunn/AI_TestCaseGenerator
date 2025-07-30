@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Case Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header-row">
+        <h1>AI Test Case Generator</h1>
+        <div class="theme-toggle">
+          <label class="switch">
+            <input type="checkbox" id="themeToggle" />
+            <span class="slider round"></span>
+          </label>
+          <span>🌞 / 🌙</span>
+        </div>
+      </div>
+
+      <textarea
+        id="requirement"
+        placeholder="Enter a feature requirement or import from Jira below..."
+      ></textarea>
+
+      <div class="options-card">
+        <div class="form-grid">
+          <div>
+            <label>Select Test Type:</label>
+            <div class="custom-select-wrapper">
+              <div class="custom-select" data-id="testtype">
+                <div class="custom-select__trigger">
+                  <span>Smoke</span>
+                </div>
+                <div class="custom-options">
+                  <div class="custom-option selected" data-value="Smoke">
+                    <span>✔</span> Smoke
+                  </div>
+                  <div class="custom-option" data-value="Regression">
+                    <span>✔</span> Regression
+                  </div>
+                  <div class="custom-option" data-value="Functional">
+                    <span>✔</span> Functional
+                  </div>
+                  <div class="custom-option" data-value="Integration">
+                    <span>✔</span> Integration
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Select Complexity:</label>
+            <div class="custom-select-wrapper">
+              <div class="custom-select" data-id="complexity">
+                <div class="custom-select__trigger">
+                  <span>Medium (5–20 steps)</span>
+                </div>
+                <div class="custom-options">
+                  <div class="custom-option" data-value="1">
+                    <span>✔</span> Easy (1–5 steps)
+                  </div>
+                  <div class="custom-option selected" data-value="2">
+                    <span>✔</span> Medium (5–20 steps)
+                  </div>
+                  <div class="custom-option" data-value="3">
+                    <span>✔</span> Hard (20+ steps)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Select Test Case Count:</label>
+            <div class="custom-select-wrapper">
+              <div class="custom-select" data-id="testcount">
+                <div class="custom-select__trigger">
+                  <span>5–20 Test Cases</span>
+                </div>
+                <div class="custom-options">
+                  <div class="custom-option" data-value="1">
+                    <span>✔</span> 1–5 Test Cases
+                  </div>
+                  <div class="custom-option selected" data-value="2">
+                    <span>✔</span> 5–20 Test Cases
+                  </div>
+                  <div class="custom-option" data-value="3">
+                    <span>✔</span> 20+ Test Cases
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Select Output Format:</label>
+            <div class="custom-select-wrapper">
+              <div class="custom-select" data-id="outputFormat">
+                <div class="custom-select__trigger">
+                  <span>Human-Readable Steps</span>
+                </div>
+                <div class="custom-options">
+                  <div class="custom-option selected" data-value="text">
+                    <span>✔</span> Human-Readable Steps
+                  </div>
+                  <div class="custom-option" data-value="playwright">
+                    <span>✔</span> Playwright Script (JS)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Select Data Variations (Optional):</label>
+            <div class="custom-select-wrapper">
+              <div
+                class="custom-select"
+                data-id="dataVariations"
+                data-multi-select="true"
+              >
+                <div class="custom-select__trigger">
+                  <span>Select variations...</span>
+                </div>
+                <div class="custom-options">
+                  <div class="custom-option" data-value="Valid">
+                    <span>✔</span> Valid Data
+                  </div>
+                  <div class="custom-option" data-value="Invalid">
+                    <span>✔</span> Invalid Data
+                  </div>
+                  <div class="custom-option" data-value="Boundary">
+                    <span>✔</span> Boundary/Edge Cases
+                  </div>
+                  <div class="custom-option" data-value="Empty">
+                    <span>✔</span> Empty/Null Data
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label>Knowledge Base:</label>
+            <div class="checkbox-wrapper">
+              <input type="checkbox" id="use-kb" checked />
+              <label for="use-kb">Use Knowledge Base</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="context-card">
+        <h2>Provide Application Context</h2>
+        <div class="context-upload-row">
+          <label for="app-code-files" class="file-label">📂 Upload Code</label>
+          <input type="file" id="app-code-files" multiple />
+          <label for="app-docs-file" class="file-label">📄 Upload Docs</label>
+          <input type="file" id="app-docs-file" />
+        </div>
+        <div id="code-files-list"></div>
+        <div id="docs-file-list"></div>
+      </div>
+
+      <div class="kb-card">
+        <h2>Knowledge Base</h2>
+        <div class="context-upload-row">
+          <label for="kb-upload-file" class="file-label">
+            📚 Upload Document
+          </label>
+          <input type="file" id="kb-upload-file" accept=".txt,.md,.json" />
+        </div>
+        <div id="kb-files-list"></div>
+      </div>
+
+      <div class="jira-import-row">
+        <input
+          type="text"
+          id="jiraIssueKey"
+          placeholder="Enter Jira Issue Key (e.g., PROJ-123)"
+        />
+        <button id="importFromJiraBtn" type="button">
+          ⬇️ Import from Jira
+        </button>
+      </div>
+
+      <div class="button-row">
+        <label for="imageInput" class="file-label">📷 Upload Screenshot</label>
+        <input type="file" id="imageInput" accept="image/*" multiple />
+        <button id="extractBtn" type="button">Extract Text</button>
+        <button id="copyBtn" type="button">📋 Copy All</button>
+        <button id="downloadTxtBtn" type="button">⬇️ Download .txt</button>
+        <button id="sendToZephyrBtn" type="button">⬆️ Send to Zephyr</button>
+        <button id="runTestBtn" type="button">▶️ Run Test</button>
+      </div>
+
+      <button id="generateBtn" type="button" class="generate-button-main">
+        Generate Test Cases
+      </button>
+
+      <div id="finalOutput" class="final-output"></div>
+
+      <div
+        id="clear-btn-container"
+        style="display: none; text-align: center; margin-top: 1.5rem"
+      >
+        <button id="clearBtn" type="button">Clear Results</button>
+      </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div id="refine-modal" class="modal-overlay">
+      <div class="modal-content">
+        <span class="modal-close-btn">&times;</span>
+        <h2>Refine Test Case</h2>
+        <div id="modal-chat-history" class="modal-chat-history"></div>
+        <div class="modal-input-area">
+          <textarea
+            id="modal-chat-input"
+            placeholder="Your instruction... e.g., 'make this test stricter'"
+          ></textarea>
+          <button id="modal-send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script src="script.js"></script>
+  </body>
+</html>

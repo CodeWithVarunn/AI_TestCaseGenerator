@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Run Results</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      .results-container {
+        max-width: 900px;
+        margin: auto;
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        background-color: var(--container-bg-color);
+        border: 1px solid var(--border-color);
+      }
+      #results-log {
+        background-color: var(--card-bg-color);
+        color: var(--text-color);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        min-height: 300px;
+        font-family: monospace;
+      }
+      .status {
+        font-size: 1.5rem;
+        font-weight: bold;
+        padding: 1rem;
+        border-radius: var(--border-radius);
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+      .status.passed {
+        background-color: var(--success-color);
+        color: white;
+      }
+      .status.failed {
+        background-color: #dc3545;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="results-container">
+      <h1>Test Run Results</h1>
+      <div id="status-banner"></div>
+      <pre id="results-log">Running test...</pre>
+    </div>
+    <script src="run_test.js"></script>
+  </body>
+</html>
