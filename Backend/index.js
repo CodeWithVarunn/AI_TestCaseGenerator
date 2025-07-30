@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const path = require('path'); // ADDED: For creating robust file paths
 
 const stringSimilarity = require('string-similarity');
 const { createClient } = require('@supabase/supabase-js');
@@ -17,217 +18,220 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('frontend'));
 const upload = multer({ dest: 'uploads/' });
 
-// --- Helper Functions ---
+// --- THIS IS THE UPDATED STATIC FILE SERVING LOGIC ---
+// It correctly points to your "Frontend" folder from the "Backend" folder
+const frontendPath = path.join(__dirname, '..', 'Frontend');
+app.use(express.static(frontendPath));
 
+// --- Helper Functions ---
+// ... (all your existing helper functions remain unchanged) ...
 function cleanOutput(text) {
-  return text
-    .replace(/^[*•+]\s?/gm, '')
-    .replace(/^\s*-\s?/gm, '- ')
-    .replace(/\*\*/g, '')
-    .replace(/\r?\n{2,}/g, '\n\n')
-    .trim();
+  return text
+    .replace(/^[*•+]\s?/gm, '')
+    .replace(/^\s*-\s?/gm, '- ')
+    .replace(/\*\*/g, '')
+    .replace(/\r?\n{2,}/g, '\n\n')
+    .trim();
 }
 
 function parseTestCasesFromText(rawText) {
-  const testCases = [];
-  const textBlocks = rawText.trim().split(/\n\s*\n/);
-  textBlocks.forEach((block) => {
-    if (!block.toLowerCase().startsWith('test case')) return;
-    const lines = block.split('\n');
-    const title = lines[0].replace(/Test Case \d+:\s*/, '').trim();
-    let currentSection = '';
-    let steps = '';
-    let expectedResult = '';
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.toLowerCase().startsWith('preconditions:'))
-        currentSection = 'preconditions';
-      else if (line.toLowerCase().startsWith('steps:'))
-        currentSection = 'steps';
-      else if (line.toLowerCase().startsWith('expected result:'))
-        currentSection = 'expected';
-      else if (line.startsWith('-')) {
-        if (currentSection === 'steps') steps += line + '\n';
-        else if (currentSection === 'expected') expectedResult += line + '\n';
-      }
-    }
-    testCases.push({ title, steps, expectedResult });
-  });
-  return testCases;
+  const testCases = [];
+  const textBlocks = rawText.trim().split(/\n\s*\n/);
+  textBlocks.forEach((block) => {
+    if (!block.toLowerCase().startsWith('test case')) return;
+    const lines = block.split('\n');
+    const title = lines[0].replace(/Test Case \d+:\s*/, '').trim();
+    let currentSection = '';
+    let steps = '';
+    let expectedResult = '';
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.toLowerCase().startsWith('preconditions:'))
+        currentSection = 'preconditions';
+      else if (line.toLowerCase().startsWith('steps:'))
+        currentSection = 'steps';
+      else if (line.toLowerCase().startsWith('expected result:'))
+        currentSection = 'expected';
+      else if (line.startsWith('-')) {
+        if (currentSection === 'steps') steps += line + '\n';
+        else if (currentSection === 'expected') expectedResult += line + '\n';
+      }
+    }
+    testCases.push({ title, steps, expectedResult });
+  });
+  return testCases;
 }
 
 function extractTextFromAdf(adf) {
-  if (!adf || !adf.content) return '';
-  let text = '';
-  adf.content.forEach((node) => {
-    if (node.type === 'paragraph' && node.content) {
-      node.content.forEach((child) => {
-        if (child.type === 'text') text += child.text + ' ';
-      });
-      text += '\n';
-    }
-  });
-  return text.trim();
+  if (!adf || !adf.content) return '';
+  let text = '';
+  adf.content.forEach((node) => {
+    if (node.type === 'paragraph' && node.content) {
+      node.content.forEach((child) => {
+        if (child.type === 'text') text += child.text + ' ';
+      });
+      text += '\n';
+    }
+  });
+  return text.trim();
 }
 
 function getTestCaseRange(level) {
-  if (level === 1) return '1–5';
-  if (level === 2) return '5–20';
-  return '20+';
+  if (level === 1) return '1–5';
+  if (level === 2) return '5–20';
+  return '20+';
 }
 
 function getComplexityDescription(level) {
-  if (level === 1) return 'short and simple (1–5 steps)';
-  if (level === 2) return 'moderate in length (5–20 steps)';
-  return 'detailed and complex (20+ steps)';
+  if (level === 1) return 'short and simple (1–5 steps)';
+  if (level === 2) return 'moderate in length (5–20 steps)';
+  return 'detailed and complex (20+ steps)';
 }
 
 async function saveTestCase(input, testCaseObj) {
-  const {
-    testType,
-    complexity,
-    testCount,
-    outputFormat,
-    dataCategories,
-    testCase,
-  } = testCaseObj;
+  const {
+    testType,
+    complexity,
+    testCount,
+    outputFormat,
+    dataCategories,
+    testCase,
+  } = testCaseObj;
 
-  const { data, error } = await supabase.from('test_cases').insert({
-    input_text: input,
-    test_type: testType,
-    complexity: complexity,
-    test_count: testCount,
-    output_format: outputFormat,
-    data_categories: dataCategories,
-    generated_output: testCase.raw,
-  });
-  if (error) console.error('❌ Supabase save error:', error);
-  else console.log('✅ Test case saved to Supabase.');
+  const { data, error } = await supabase.from('test_cases').insert({
+    input_text: input,
+    test_type: testType,
+    complexity: complexity,
+    test_count: testCount,
+    output_format: outputFormat,
+    data_categories: dataCategories,
+    generated_output: testCase.raw,
+  });
+  if (error) console.error('❌ Supabase save error:', error);
+  else console.log('✅ Test case saved to Supabase.');
 }
 
 async function findExactMatch(
-  inputText,
-  testType,
-  complexity,
-  testCount,
-  outputFormat,
-  dataCategories
+  inputText,
+  testType,
+  complexity,
+  testCount,
+  outputFormat,
+  dataCategories
 ) {
-  const sortedCategories = dataCategories.sort();
-  const { data, error } = await supabase
-    .from('test_cases')
-    .select('generated_output')
-    .eq('input_text', inputText)
-    .eq('test_type', testType)
-    .eq('complexity', complexity)
-    .eq('test_count', testCount)
-    .eq('output_format', outputFormat)
-    .eq('data_categories', sortedCategories)
-    .limit(1)
-    .single();
-  if (data) return { testCase: { raw: data.generated_output } };
-  return null;
+  const sortedCategories = dataCategories.sort();
+  const { data, error } = await supabase
+    .from('test_cases')
+    .select('generated_output')
+    .eq('input_text', inputText)
+    .eq('test_type', testType)
+    .eq('complexity', complexity)
+    .eq('test_count', testCount)
+    .eq('output_format', outputFormat)
+    .eq('data_categories', sortedCategories)
+    .limit(1)
+    .single();
+  if (data) return { testCase: { raw: data.generated_output } };
+  return null;
 }
 
 async function getLikedExamples(limit = 2) {
-  const { data, error } = await supabase
-    .from('feedback_log')
-    .select('test_case_content')
-    .eq('feedback_type', 'positive')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error('❌ Error fetching liked examples:', error);
-    return [];
-  }
-  return data.map((item) => item.test_case_content);
+  const { data, error } = await supabase
+    .from('feedback_log')
+    .select('test_case_content')
+    .eq('feedback_type', 'positive')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('❌ Error fetching liked examples:', error);
+    return [];
+  }
+  return data.map((item) => item.test_case_content);
 }
 
-// ⭐ NEW: Helper function to get all knowledge base content
 async function getKnowledgeBaseContent() {
-    const { data, error } = await supabase.from('knowledge_base').select('content');
-    if (error) {
-        console.error('❌ Error fetching knowledge base:', error);
-        return '';
-    }
-    return data.map(doc => doc.content).join('\n\n---\n\n');
+    const { data, error } = await supabase.from('knowledge_base').select('content');
+    if (error) {
+        console.error('❌ Error fetching knowledge base:', error);
+        return '';
+    }
+    return data.map(doc => doc.content).join('\n\n---\n\n');
 }
 
 // --- API Endpoints ---
-
+// ... (all your existing API endpoints remain unchanged) ...
 app.get('/api/knowledge-base', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('knowledge_base')
-            .select('id, document_name');
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch knowledge base files.' });
-    }
+    try {
+        const { data, error } = await supabase
+            .from('knowledge_base')
+            .select('id, document_name');
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch knowledge base files.' });
+    }
 });
 
 app.post('/api/knowledge-base/upload', upload.single('kbfile'), async (req, res) => {
-    try {
-        const file = req.file;
-        if (!file) {
-            return res.status(400).json({ error: 'No file uploaded.' });
-        }
-        const content = fs.readFileSync(file.path, 'utf-8');
-        const { error } = await supabase.from('knowledge_base').insert({
-            document_name: file.originalname,
-            content: content,
-        });
-        fs.unlinkSync(file.path); // Clean up uploaded file from server
-        if (error) throw error;
-        res.status(201).json({ message: 'File uploaded successfully.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to upload file.' });
-    }
+    try {
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'No file uploaded.' });
+        }
+        const content = fs.readFileSync(file.path, 'utf-8');
+        const { error } = await supabase.from('knowledge_base').insert({
+            document_name: file.originalname,
+            content: content,
+        });
+        fs.unlinkSync(file.path);
+        if (error) throw error;
+        res.status(201).json({ message: 'File uploaded successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to upload file.' });
+    }
 });
 
 app.delete('/api/knowledge-base/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { error } = await supabase.from('knowledge_base').delete().eq('id', id);
-        if (error) throw error;
-        res.status(200).json({ message: 'File deleted successfully.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to delete file.' });
-    }
+    try {
+        const { id } = req.params;
+        const { error } = await supabase.from('knowledge_base').delete().eq('id', id);
+        if (error) throw error;
+        res.status(200).json({ message: 'File deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete file.' });
+    }
 });
 
 app.post('/api/feedback', async (req, res) => {
-  const { testCaseContent, feedbackType, originalPrompt } = req.body;
-  if (!testCaseContent || !feedbackType || !originalPrompt) {
-    return res.status(400).json({ error: 'Missing required feedback data.' });
-  }
-  try {
-    const { error } = await supabase.from('feedback_log').insert({
-      test_case_content: testCaseContent,
-      feedback_type: feedbackType,
-      original_prompt: originalPrompt,
-    });
-    if (error) throw error;
-    res.status(200).json({ message: 'Feedback saved successfully.' });
-    console.log(`✅ Feedback (${feedbackType}) saved to Supabase.`);
-  } catch (err) {
-    console.error('❌ Supabase feedback save error:', err);
-    res.status(500).json({ error: 'Failed to save feedback.' });
-  }
+  const { testCaseContent, feedbackType, originalPrompt } = req.body;
+  if (!testCaseContent || !feedbackType || !originalPrompt) {
+    return res.status(400).json({ error: 'Missing required feedback data.' });
+  }
+  try {
+    const { error } = await supabase.from('feedback_log').insert({
+      test_case_content: testCaseContent,
+      feedback_type: feedbackType,
+      original_prompt: originalPrompt,
+    });
+    if (error) throw error;
+    res.status(200).json({ message: 'Feedback saved successfully.' });
+    console.log(`✅ Feedback (${feedbackType}) saved to Supabase.`);
+  } catch (err) {
+    console.error('❌ Supabase feedback save error:', err);
+    res.status(500).json({ error: 'Failed to save feedback.' });
+  }
 });
 
 app.post('/api/refine-testcase', async (req, res) => {
-  const { originalTestCase, refinementInstruction } = req.body;
-  if (!originalTestCase || !refinementInstruction) {
-    return res
-      .status(400)
-      .json({ error: 'Missing original test case or instruction.' });
-  }
-  const prompt = `You are a test case refiner. Your task is to modify an existing test case based on a user's instruction.
+  const { originalTestCase, refinementInstruction } = req.body;
+  if (!originalTestCase || !refinementInstruction) {
+    return res
+      .status(400)
+      .json({ error: 'Missing original test case or instruction.' });
+  }
+  const prompt = `You are a test case refiner. Your task is to modify an existing test case based on a user's instruction.
 Respond with ONLY the complete, raw, updated test case text. Do not add any extra explanations or markdown formatting.
 
 --- ORIGINAL TEST CASE ---
@@ -238,87 +242,85 @@ ${refinementInstruction}
 
 --- REFINED TEST CASE ---
 `;
-  try {
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama3-70b-8192',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.5,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    const refinedTestCase = response.data.choices[0].message.content.trim();
-    res.json({ refinedTestCase });
-  } catch (error) {
-    console.error(
-      '❌ Refinement Error:',
-      error.response?.data || error.message
-    );
-    res.status(500).json({ error: 'Failed to refine the test case.' });
-  }
+  try {
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama3-70b-8192',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.5,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    const refinedTestCase = response.data.choices[0].message.content.trim();
+    res.json({ refinedTestCase });
+  } catch (error) {
+    console.error(
+      '❌ Refinement Error:',
+      error.response?.data || error.message
+    );
+    res.status(500).json({ error: 'Failed to refine the test case.' });
+  }
 });
 
 app.post('/generate-testcase', async (req, res) => {
-  const {
-    inputText,
-    testType = 'Functional',
-    complexity = 2,
-    testCount = 2,
-    outputFormat = 'text',
-    appCode,
-    appDocs,
-    dataCategories = [],
-    useKnowledgeBase, // ⭐ NEW: Get the checkbox value
-  } = req.body;
+  const {
+    inputText,
+    testType = 'Functional',
+    complexity = 2,
+    testCount = 2,
+    outputFormat = 'text',
+    appCode,
+    appDocs,
+    dataCategories = [],
+    useKnowledgeBase,
+  } = req.body;
 
-  console.log('📨 Received request:', {
-    inputText,
-    testType,
-    outputFormat,
-    dataCategories,
-    useKnowledgeBase,
-  });
+  console.log('📨 Received request:', {
+    inputText,
+    testType,
+    outputFormat,
+    dataCategories,
+    useKnowledgeBase,
+  });
 
-  const existingMatch = await findExactMatch(
-    inputText,
-    testType,
-    complexity,
-    testCount,
-    outputFormat,
-    dataCategories
-  );
-  if (existingMatch) {
-    console.log('✅ Found exact match in Supabase cache.');
-    return res.json({ fromCache: 'exact', outputFormat, ...existingMatch });
-  }
+  const existingMatch = await findExactMatch(
+    inputText,
+    testType,
+    complexity,
+    testCount,
+    outputFormat,
+    dataCategories
+  );
+  if (existingMatch) {
+    console.log('✅ Found exact match in Supabase cache.');
+    return res.json({ fromCache: 'exact', outputFormat, ...existingMatch });
+  }
 
-  const likedExamples = await getLikedExamples(2);
-  let feedbackInstruction = '';
-  if (likedExamples.length > 0) {
-    feedbackInstruction = `Based on these user-liked examples, generate test cases in a similar style and quality:\n\n--- LIKED EXAMPLE 1 ---\n${likedExamples[0]}\n\n`;
-    if (likedExamples.length > 1) {
-      feedbackInstruction += `--- LIKED EXAMPLE 2 ---\n${likedExamples[1]}\n\n`;
-    }
-  }
+  const likedExamples = await getLikedExamples(2);
+  let feedbackInstruction = '';
+  if (likedExamples.length > 0) {
+    feedbackInstruction = `Based on these user-liked examples, generate test cases in a similar style and quality:\n\n--- LIKED EXAMPLE 1 ---\n${likedExamples[0]}\n\n`;
+    if (likedExamples.length > 1) {
+      feedbackInstruction += `--- LIKED EXAMPLE 2 ---\n${likedExamples[1]}\n\n`;
+    }
+  }
 
-  // ⭐ NEW: Fetch and prepare knowledge base content
-  let knowledgeBaseInstruction = '';
-  if (useKnowledgeBase) {
-      const kbContent = await getKnowledgeBaseContent();
-      if (kbContent) {
-          knowledgeBaseInstruction = `Use the following permanent knowledge base as the primary source of truth for context, standards, and requirements:\n\n--- KNOWLEDGE BASE ---\n${kbContent}\n\n--- END KNOWLEDGE BASE ---\n\n`;
-      }
-  }
+  let knowledgeBaseInstruction = '';
+  if (useKnowledgeBase) {
+      const kbContent = await getKnowledgeBaseContent();
+      if (kbContent) {
+          knowledgeBaseInstruction = `Use the following permanent knowledge base as the primary source of truth for context, standards, and requirements:\n\n--- KNOWLEDGE BASE ---\n${kbContent}\n\n--- END KNOWLEDGE BASE ---\n\n`;
+      }
+  }
 
-  let scenarioInstruction = '';
-  // ... (switch statement remains the same)
-  switch (testType) {
+  let scenarioInstruction = '';
+  switch (testType) {
     case 'Functional': scenarioInstruction = 'Generate a comprehensive mix of both positive (happy path) and negative (error, invalid input, edge case) test cases.\n\n'; break;
     case 'Regression': scenarioInstruction = "Focus on a mix of core positive paths and potential areas of failure to ensure existing functionality hasn't broken.\n\n"; break;
     case 'Integration': scenarioInstruction = 'Focus on how modules interact, including positive cases where data flows correctly and negative cases where one module sends bad data.\n\n'; break;
@@ -326,16 +328,15 @@ app.post('/generate-testcase', async (req, res) => {
     default: scenarioInstruction = 'Generate a standard set of positive test cases.\n\n';
   }
 
-  let dataVariationInstruction = '';
-  if (dataCategories && dataCategories.length > 0) {
-    dataVariationInstruction = `Additionally, ensure the generated test cases specifically cover the following data scenarios: ${dataCategories.join(
-      ', '
-    )}.\n\n`;
-  }
+  let dataVariationInstruction = '';
+  if (dataCategories && dataCategories.length > 0) {
+    dataVariationInstruction = `Additionally, ensure the generated test cases specifically cover the following data scenarios: ${dataCategories.join(
+      ', '
+    )}.\n\n`;
+  }
 
-  let formatInstruction = '';
-  // ... (format instruction logic remains the same)
-  if (outputFormat === 'playwright') {
+  let formatInstruction = '';
+  if (outputFormat === 'playwright') {
     formatInstruction = `
 You are an expert Playwright automation engineer. Your task is to generate a complete, production-quality Playwright test script. Follow these rules STRICTLY:
 1.  **Output Format:** - Respond with ONLY the raw Playwright script code in JavaScript. - DO NOT wrap the code in markdown blocks like \`\`\`javascript.
@@ -362,61 +363,59 @@ Expected Result:
 - [Verification point 2]`;
   }
 
-  const contextInstruction =
-    appCode || appDocs
-      ? `Use the following application context.\n\n--- APP DOCS ---\n${appDocs}\n\n--- APP CODE ---\n${appCode}\n\n`
-      : '';
+  const contextInstruction =
+    appCode || appDocs
+      ? `Use the following application context.\n\n--- APP DOCS ---\n${appDocs}\n\n--- APP CODE ---\n${appCode}\n\n`
+      : '';
 
-  // ⭐ NEW: Add the knowledge base instruction to the final prompt
-  const prompt =
-    `You are an expert QA engineer. Generate ${getTestCaseRange(
-      testCount
-    )} ${testType} test cases for:\n${inputText}\n\n` +
-    `${knowledgeBaseInstruction}${feedbackInstruction}${contextInstruction}${scenarioInstruction}${dataVariationInstruction}` +
-    `Each test case should be ${getComplexityDescription(complexity)}.\n\n` +
-    `${formatInstruction}`;
+  const prompt =
+    `You are an expert QA engineer. Generate ${getTestCaseRange(
+      testCount
+    )} ${testType} test cases for:\n${inputText}\n\n` +
+    `${knowledgeBaseInstruction}${feedbackInstruction}${contextInstruction}${scenarioInstruction}${dataVariationInstruction}` +
+    `Each test case should be ${getComplexityDescription(complexity)}.\n\n` +
+    `${formatInstruction}`;
 
-  try {
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama3-70b-8192',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    let testCaseRaw = response.data.choices[0].message.content || '';
-    if (outputFormat !== 'playwright') {
-      testCaseRaw = cleanOutput(testCaseRaw);
-    }
-    const structured = {
-      testType,
-      complexity,
-      testCount,
-      outputFormat,
-      dataCategories,
-      testCase: { raw: testCaseRaw.trim() },
-    };
-    await saveTestCase(inputText, structured);
-    res.json({ fromCache: false, ...structured });
-  } catch (error) {
-    console.error(
-      '❌ Generation Error:',
-      error.response?.data || error.message
-    );
-    res.status(500).json({ error: 'Failed to generate test case.' });
-  }
+  try {
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama3-70b-8192',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    let testCaseRaw = response.data.choices[0].message.content || '';
+    if (outputFormat !== 'playwright') {
+      testCaseRaw = cleanOutput(testCaseRaw);
+    }
+    const structured = {
+      testType,
+      complexity,
+      testCount,
+      outputFormat,
+      dataCategories,
+      testCase: { raw: testCaseRaw.trim() },
+    };
+    await saveTestCase(inputText, structured);
+    res.json({ fromCache: false, ...structured });
+  } catch (error) {
+    console.error(
+      '❌ Generation Error:',
+      error.response?.data || error.message
+    );
+    res.status(500).json({ error: 'Failed to generate test case.' });
+  }
 });
 
 app.post('/run-test', async (req, res) => {
-  // ... (rest of the file is unchanged)
-  const { testCaseText } = req.body;
+  const { testCaseText } = req.body;
   if (!testCaseText) {
     return res.status(400).json({ error: 'No test case text provided.' });
   }
@@ -540,7 +539,13 @@ app.post('/create-zephyr-tests', async (req, res) => {
     });
 });
 
+// --- ADD THIS CATCH-ALL ROUTE ---
+// For any request that doesn't match a static file or an API route, send the main index.html file.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
